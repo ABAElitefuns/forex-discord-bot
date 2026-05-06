@@ -152,72 +152,82 @@ async def analyze_news(event: dict) -> str:
 # 📨 DISCORD EMBEDS
 # ─────────────────────────────────────────────
 async def send_5min_warning(channel: discord.TextChannel, event: dict, dt_utc: datetime):
-    """ส่งการแจ้งเตือนล่วงหน้า 5 นาที"""
+    """ส่งการแจ้งเตือนล่วงหน้า 5 นาที — สีส้ม"""
     dt_bkk = dt_utc.astimezone(BKK_TZ)
     time_str = dt_bkk.strftime("%H:%M น. (Bangkok)")
-
-    embed = discord.Embed(
-        title="⚠️  ข่าว HIGH IMPACT กำลังจะออก!",
-        description=f"**{event.get('title')}** จะประกาศในอีก **5 นาที**",
-        color=0xFFCC00,
-        timestamp=datetime.utcnow(),
-    )
-    embed.add_field(name="🕐 เวลาออก", value=time_str, inline=True)
-    embed.add_field(name="🌎 ประเทศ", value="🇺🇸 United States", inline=True)
-    embed.add_field(name="💥 ระดับ", value="🔴 HIGH IMPACT", inline=True)
-    embed.add_field(
-        name="📊 ตัวเลขอ้างอิง",
-        value=(
-            f"**Forecast:** `{event.get('forecast', 'N/A')}`\n"
-            f"**Previous:** `{event.get('previous', 'N/A')}`"
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name="📌 คำแนะนำ",
-        value="⚡ ระวังความผันผวนสูง — พิจารณาลด position หรืองด trade ช่วงนี้",
-        inline=False,
-    )
-    embed.set_footer(text="Forex Alert Bot • ไม่ใช่คำแนะนำทางการเงิน")
-
-    await channel.send("@here", embed=embed)
-    log.info(f"✅ ส่งแจ้งเตือน 5 นาที: {event.get('title')}")
-
-async def send_actual_result(channel: discord.TextChannel, event: dict, analysis: str):
-    """ส่งผลจริงพร้อม AI วิเคราะห์"""
-    actual   = event.get("actual", "N/A")
+    title    = event.get("title", "N/A")
     forecast = event.get("forecast", "N/A")
     previous = event.get("previous", "N/A")
 
-    # สีตาม actual vs forecast
-    color = 0x808080
+    embed = discord.Embed(
+        title=f"⚠️  HIGH IMPACT — เตรียมตัวได้เลย!",
+        description=(
+            f"**{title}** 🇺🇸 จะออกในอีก **5 นาที**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱️  **{time_str}**"
+        ),
+        color=0xF97316,  # ส้ม
+        timestamp=datetime.utcnow(),
+    )
+    embed.add_field(name="📈 Forecast", value=f"```{forecast}```", inline=True)
+    embed.add_field(name="📉 Previous", value=f"```{previous}```", inline=True)
+    embed.add_field(name="💥 Impact",   value="🔴 **HIGH**",        inline=True)
+    embed.add_field(
+        name="⚡ คำแนะนำ",
+        value="ลด position หรืองด trade ช่วงนี้ — รอดูตัวเลขก่อนค่อย action",
+        inline=False,
+    )
+    embed.set_footer(text="Forex Alert Bot • ForexFactory • ไม่ใช่คำแนะนำทางการเงิน")
+
+    await channel.send("@here", embed=embed)
+    log.info(f"✅ ส่งแจ้งเตือน 5 นาที: {title}")
+
+async def send_actual_result(channel: discord.TextChannel, event: dict, analysis: str):
+    """ส่งผลจริงพร้อม AI วิเคราะห์ — สีแดง"""
+    actual   = event.get("actual", "N/A")
+    forecast = event.get("forecast", "N/A")
+    previous = event.get("previous", "N/A")
+    title    = event.get("title", "N/A")
+
+    # เปรียบเทียบ actual vs forecast
+    compare_text = ""
     try:
         a = float(actual.replace("%","").replace("K","").replace("M","").replace("B","").strip())
         f = float(forecast.replace("%","").replace("K","").replace("M","").replace("B","").strip())
-        color = 0x2ECC71 if a >= f else 0xE74C3C
+        if a > f:
+            compare_text = f"✅ ดีกว่าคาด  ({actual} > {forecast})"
+        elif a < f:
+            compare_text = f"❌ แย่กว่าคาด  ({actual} < {forecast})"
+        else:
+            compare_text = f"➡️ ตรงตามคาด  ({actual})"
     except Exception:
-        color = 0x3498DB
+        compare_text = f"Actual: {actual}  |  Forecast: {forecast}"
+
+    # AI analysis (ตัดถ้ายาวเกิน 1020 ตัวอักษร)
+    analysis_display = analysis if len(analysis) <= 1020 else analysis[:1017] + "..."
 
     embed = discord.Embed(
-        title=f"🚨  ข่าวออกแล้ว! — {event.get('title')}",
-        color=color,
+        title=f"🚨  {title} — ตัวเลขออกแล้ว!",
+        description=(
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{compare_text}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━"
+        ),
+        color=0xEF4444,  # แดง
         timestamp=datetime.utcnow(),
     )
-    embed.add_field(name="✅ Actual",   value=f"**`{actual}`**",   inline=True)
-    embed.add_field(name="📈 Forecast", value=f"`{forecast}`",     inline=True)
-    embed.add_field(name="📉 Previous", value=f"`{previous}`",     inline=True)
-
-    # AI analysis (ตัดถ้ายาวเกิน 1024 ตัวอักษร)
-    analysis_display = analysis if len(analysis) <= 1020 else analysis[:1017] + "..."
+    embed.add_field(name="✅ Actual",   value=f"```{actual}```",   inline=True)
+    embed.add_field(name="📈 Forecast", value=f"```{forecast}```", inline=True)
+    embed.add_field(name="📉 Previous", value=f"```{previous}```", inline=True)
     embed.add_field(
-        name="🤖 การวิเคราะห์โดย Claude AI",
+        name="🤖 Claude AI วิเคราะห์",
         value=analysis_display,
         inline=False,
     )
-    embed.set_footer(text="Forex Alert Bot • ข้อมูลจาก ForexFactory • ไม่ใช่คำแนะนำทางการเงิน")
+    embed.set_footer(text="Forex Alert Bot • ForexFactory • ไม่ใช่คำแนะนำทางการเงิน")
 
     await channel.send("@here", embed=embed)
-    log.info(f"✅ ส่งผล + AI Analysis: {event.get('title')}")
+    log.info(f"✅ ส่งผล + AI Analysis: {title}")
 
 # ─────────────────────────────────────────────
 # ⏰ BACKGROUND TASK — ตรวจข่าวทุก 1 นาที
